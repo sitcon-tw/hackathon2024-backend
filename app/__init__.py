@@ -1,9 +1,10 @@
-from flask import Flask
+from flask import Flask, Blueprint
 
 
 def create_app(env):
     app = Flask(__name__)
 
-	# future blueprints
+    from .views import bp
+    app.register_blueprint(bp, url_prefix="/api")
 
     return app
