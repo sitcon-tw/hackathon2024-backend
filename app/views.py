@@ -1,4 +1,4 @@
-from flask import Blueprint, send_from_directory, session
+from flask import Blueprint, send_from_directory, session, request
 
 
 bp = Blueprint("main", __name__)
@@ -15,7 +15,14 @@ def guess_page(problem):
 
 @bp.route("/collect", methods=["POST"])
 def collect_page():
-    ...
+    data = request.get_json()
+    token = data.get("token", None)
+    if not token:
+        return "", 400
+    if True:
+        return ""
+    else:
+        return "", 201
 
 @bp.route("/stamp/<int:number>", methods=["GET"])
 def stamp_page(number):
