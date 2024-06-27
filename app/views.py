@@ -18,7 +18,7 @@ def login_page():
     # placeholder
     session["username"] = "test"
 
-@bp.route("/guess/<string:problem>", methods=["POST"])
+@bp.route("/guess/<int:problem>", methods=["POST"])
 def guess_page(problem):
     data = request.get_json()
     answer = data.get("answer", None)
