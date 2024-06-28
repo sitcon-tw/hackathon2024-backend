@@ -1,5 +1,12 @@
+import os
 from flask import Blueprint, send_from_directory, session, request
+from pymongo import MongoClient
 
+username = os.getenv("MONGO_USERNAME", "admin")
+password = os.getenv("MONGO_PASSWORD", "admin")
+client = MongoClient(f"mongodb://{username}:{password}@mongodb:27017/")
+database = client["sitcon-hackathon"]
+collection = database["users"]
 
 bp = Blueprint("main", __name__)
 
@@ -9,7 +16,7 @@ def login_page():
     user_token = data.get("user_token", None)
     # query database
     valid_account = True
-    
+
     if not valid_account:
         return "", 400
     if True:
@@ -25,7 +32,7 @@ def guess_page(problem):
     if len(answer) != 4:
         message = {"message": "系統錯誤"}
         return jsonify(message), 400
-    
+
     # query database
     correct_answer = True
 
@@ -40,14 +47,22 @@ def guess_page(problem):
 
 @bp.route("/collect", methods=["POST"])
 def collect_page():
+    username = session.get("username", "test")
+    if not username:
+        return "", 401
     data = request.get_json()
     token = data.get("token", None)
     if not token:
         return "", 400
-    if True:
+    res = collection.find_one({"username": username})
+    if not res:
+        collection.insert_one({"username": username, "tokens": [token]})
         return ""
-    else:
+    elif token in res.get("tokens", []):
         return "", 201
+    else:
+        collection.update_one({"username": username}, {"$addToSet": {"tokens": token}})
+        return ""
 
 @bp.route("/stamp/<int:number>", methods=["GET"])
 def stamp_page(number):
