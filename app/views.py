@@ -58,7 +58,7 @@ def guess_page(problem):
         message = {"message": "系統錯誤"}
         return jsonify(message), 400
 
-    if answer == correct_answer:
+    if answer.lower() == correct_answer.lower():
         # upsert to database
         collection = database["record"]
         collection.update_one({"user_token": user_token}, {'$set':{'problem':problem}}, upsert=True)
