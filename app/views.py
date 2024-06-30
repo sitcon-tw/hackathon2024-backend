@@ -13,37 +13,60 @@ TOKEN_PROBLEM_MAP = {
 }
 
 bp = Blueprint("main", __name__)
+@bp.route("/team_info/<string:token>", methods=["GET"])
+def team_info_page(token):
+    message = {"team_name": "Team 1", "team_member": ["Alice", "Bob", "Cathy", "David"]}
+    return jsonify(message), 200
+
+@bp.route("/is_logged", methods=["GET"])
+def is_logged_page():
+    if session.get("user_token", None):
+        message = {"team_name": session["team_name"]}
+        return jsonify(message), 200
+    else:
+        return "token not matched", 400
 
 @bp.route("/login", methods=["POST"])
 def login_page():
     data = request.get_json()
     user_token = data.get("user_token", None)
     # query database
-    valid_account = True
+    res = collection.find_one({"user_token": user_token})
 
-    if not valid_account:
+    if not res:
         return "", 400
     if True:
         session["user_token"] = user_token
+        session["team_name"] = res["team_name"]
         return "", 200
 
 @bp.route("/guess/<int:problem>", methods=["POST"])
 def guess_page(problem):
     data = request.get_json()
-    answer = data.get("answer", None)
-    if len(answer) != 4:
+    answer = data.get("answer", None) # get answer
+    user_token = session.get("user_token", None) # get user_token
+
+    # query database problem
+    collection = database["problem"]
+    res = collection.find_one({"number": problem})
+    answer_length = len(res["answer"])
+    correct_answer = res["answer"]
+
+    if not user_token:
+        return "", 401
+    if len(answer) != answer_length:
         message = {"message": "系統錯誤"}
         return jsonify(message), 400
 
-    # query database
-    correct_answer = True
-
-    if not correct_answer:
-        message = {"message": "答案錯誤"}
-        return jsonify(message), 403
-    if True:
+    if answer == correct_answer:
+        # upsert to database
+        collection = database["record"]
+        collection.update_one({"user_token": user_token}, {'$set':{'problem':problem}}, upsert=True)
         message = {"message": "答案正確"}
         return jsonify(message), 200
+    else:
+        message = {"message": "答案錯誤"}
+        return jsonify(message), 403
 
     ...
 
