@@ -15,8 +15,9 @@ TOKEN_PROBLEM_MAP = {
 bp = Blueprint("main", __name__)
 @bp.route("/team_info/<string:token>", methods=["GET"])
 def team_info_page(token):
-    message = {"team_name": "Team 1", "team_member": ["Alice", "Bob", "Cathy", "David"]}
-    return jsonify(message), 200
+    collection = database["record"]
+    res = collection.find({"user_token": token})
+    return jsonify(res), 200
 
 @bp.route("/is_logged", methods=["GET"])
 def is_logged_page():
