@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, send_from_directory, session, request
+from flask import Blueprint, send_from_directory, session, request, jsonify
 from pymongo import MongoClient
 
 username = os.getenv("MONGO_USERNAME", "admin")
@@ -17,7 +17,10 @@ bp = Blueprint("main", __name__)
 def team_info_page(token):
     collection = database["record"]
     res = collection.find({"user_token": token})
-    return jsonify(res), 200
+    a = []
+    for x in res:
+      a.append(x['problem'])
+    return jsonify(a), 200
 
 @bp.route("/is_logged", methods=["GET"])
 def is_logged_page():
@@ -29,22 +32,20 @@ def is_logged_page():
 
 @bp.route("/login", methods=["POST"])
 def login_page():
-    data = request.get_json()
-    user_token = data.get("user_token", None)
+    user_token = request.values['user_token']
     # query database
     res = collection.find_one({"user_token": user_token})
 
     if not res:
         return "", 400
-    if True:
+    else:
         session["user_token"] = user_token
         session["team_name"] = res["team_name"]
-        return "", 200
+        return res["team_name"], 200
 
 @bp.route("/guess/<int:problem>", methods=["POST"])
 def guess_page(problem):
-    data = request.get_json()
-    answer = data.get("answer", None) # get answer
+    answer = request.values['answer']
     user_token = session.get("user_token", None) # get user_token
 
     # query database problem
@@ -62,14 +63,12 @@ def guess_page(problem):
     if answer.lower() == correct_answer.lower():
         # upsert to database
         collection = database["record"]
-        collection.update_one({"user_token": user_token}, {'$set':{'problem':problem}}, upsert=True)
+        collection.update_one({"user_token": user_token}, {'$set':{'problem': problem}}, upsert=True)
         message = {"message": "答案正確"}
         return jsonify(message), 200
     else:
         message = {"message": "答案錯誤"}
         return jsonify(message), 403
-
-    ...
 
 @bp.route("/collect", methods=["POST"])
 def collect_page():
