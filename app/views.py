@@ -1,4 +1,5 @@
 import os
+from enum import Enum
 from flask import Blueprint, send_from_directory, session, request, jsonify
 from pymongo import MongoClient
 
@@ -9,18 +10,99 @@ database = client["sitcon-hackathon"]
 collection = database["users"]
 
 TOKEN_PROBLEM_MAP = {
-    "TOKEN0": 0,
+    '8dd5c5e969ec5d24c825a409d77cb7e42794c9708c1b80c350c70b90a38f5f36': 2,
+    '929d586819380e59e49c59c09f7f2b8ff0dc8ee46012076330fffff04e876ec9': 6,
+    '96cab5718e3171b7b788e78ec7329e815ba60ada2a51838878f51e79c7a878cd': 7,
+    '5be6ce0530ed9d608b51c2adc49ce826e732253a74095d031e98a560597bb4b7': 10,
+    'a279dfa7053d3c965934183deb4aaef86f62f37a75f7dc071a019e7a61d644c5': 11,
+    'be527397b173da8d5c9fafc503d096c591af9393674dc5c1cd5b305c72fe2bf5': 12,
+    '9616971f7b97ed5ca0d40bb4a63d951679ba3d21f8aed55f1a273e7059578df3': 13,
+    '7e8e4ce30f80b85ef3b3f6f2a1bee4c267f0abd9aa5fa323c2bd2ed3ad7a8fb9': 14,
+    '0e2e9a23a50750ee09dbe5ce982b497d6f9a85b0d10bb40f72ab78519d2c5b31': 19,
+    '18ec5bf28eb443b84ccaf1792caaf9aba6a066f46b3ef3a1e824761f790d8902': 21, # Above are for stalls
+    '97973dd45474f26cea8adcc47bcf1c1c68655dbfba5df6914c213f2666c7e5f8': 4,
+    '0a8becc6c4349d4d014c9144420a9133a8d59c4a1d19d5e12d891bf6f1554091': 5, # Above are for check in wall
+    '31fb2b0ad61ffcc8b96ecd64fbb12a135e68e2484dc0afb2372e7f65d7e944df': 15,
+    '294b3e339f48879542052d9c3d119598090711c423520ea2e063c9e1ee3b2e2d': 17,
+    '38a2283f668a08414a0495de56b8180195c169465b339ce9be7091320294b410': 23 # Above are for guess where am i
+}
+GAME_ANS = {
+    0: {
+        'answer': ['COMPUTER', 'DOOR', 'STAGE', 'TABLE', 'WALL'],
+        'stamp': [[1, 3], [22]],
+        'message': [
+            '有答案是錯的歐',
+            '請再仔細看題目呦',
+            '恭喜你成功!但接下來的挑戰可沒這麼簡單歐，哈哈'
+        ]
+    },
+    1: {
+        'answer': ['Please', 'check', 'under', 'your', 'desk'],
+        'stamp': [[], [0]],
+        'message': [
+            '再仔細檢查我們精美的圖吧',
+            '再仔細檢查我們精美的圖吧',
+            '歡迎進到第二階段!'
+        ]
+    },
+    2: {
+        'answer': ['Please', 'computer'],
+        'stamp': [[24], [18]],
+        'message': [
+            '猜錯了歐，請再一次',
+            '請再確認一下答案',
+            '相當厲害，相信你也準備好進到最終試煉了，那就敬請期待吧~!'
+        ]
+    },
+    3: {
+        'answer': ['I', 'LOVE', 'SITCON', 'HACKATHON', '2024'],
+        'stamp': [[], [16, 8, 20, 9]],
+        'message': [
+            '請認真玩遊戲，不然你朋友將死於戰爭…',
+            '請認真玩遊戲，不然你朋友將死於戰爭…',
+            '恭喜你全數破關! 但，這只是集章活動的一部分，若要獲得最終獎品，還是得破完拼圖，並正確猜到最終答案歐😉'
+        ]
+    }
 }
 
+def add_stamp_to_user(user_token, stamp):
+    res = collection.find_one({"user_token": user_token})
+    if not res:
+        collection.insert_one({"user_token": user_token, "collected": [stamp]})
+        return True
+    elif stamp in res.get("collected", []):
+        return False
+    else:
+        collection.update_one({"user_token": user_token}, {"$addToSet": {"collected": stamp}})
+        return True
+
+class Result(Enum):
+    WRONG = 0
+    PARTIAL = 1
+    CORRECT = 2
+
+def compare_game_ans(guess, ans):
+    guess = [x.lower() for x in guess]
+    ans = [x.lower() for x in ans]
+    if ans == guess:
+        return Result.CORRECT
+    guess = sorted(guess)
+    ans = sorted(ans)
+    if ans == guess:
+        return Result.PARTIAL
+    return Result.WRONG
+    
+
 bp = Blueprint("main", __name__)
-@bp.route("/team_info/<string:token>", methods=["GET"])
-def team_info_page(token):
-    collection = database["record"]
-    res = collection.find({"user_token": token})
-    a = []
-    for x in res:
-      a.append(x['problem'])
-    return jsonify(a), 200
+
+# @bp.route("/team_info/<string:token>", methods=["GET"])
+# def team_info_page(token):
+#     collection = database["record"]
+#     res = collection.find({"user_token": token})
+#     a = []
+#     for x in res:
+#       a.append(x['problem'])
+#     return jsonify(a), 200
 
 @bp.route("/is_logged", methods=["GET"])
 def is_logged_page():
@@ -50,25 +132,21 @@ def guess_page(problem):
         return "", 401
     answer = request.values['answer']
 
-    # query database problem
-    collection = database["problem"]
-    res = collection.find_one({"number": problem})
-    answer_length = len(res["answer"])
-    correct_answer = res["answer"]
+    if problem not in GAME_ANS:
+        return "", 400
+    ans = GAME_ANS[problem]['answer']
+    res = compare_game_ans(answer, ans)
 
-    if len(answer) != answer_length:
-        message = {"message": "系統錯誤"}
-        return jsonify(message), 400
-
-    if answer.lower() == correct_answer.lower():
-        # upsert to database
-        collection = database["record"]
-        collection.update_one({"user_token": user_token}, {'$set':{'problem': problem}}, upsert=True)
-        message = {"message": "答案正確"}
-        return jsonify(message), 200
-    else:
-        message = {"message": "答案錯誤"}
-        return jsonify(message), 403
+    stamps = []
+    for i in range(res):
+        stamps += GAME_ANS[problem]['stamp']
+    for stamp in stamps:
+        add_stamp_to_user(user_token, stamp)
+    
+    message = {"message", GAME_ANS[problem]['message'][res]}
+    if res == Result.CORRECT:
+        database['record'].update_one({"user_token": user_token}, {'$set':{'problem': problem}}, upsert=True)
+    return jsonify(message), 200
 
 @bp.route("/collect", methods=["POST"])
 def collect_page():
@@ -77,18 +155,13 @@ def collect_page():
         return "", 401
     data = request.get_json()
     token = data.get("token", None)
-    problem = TOKEN_PROBLEM_MAP.get(token, None)
-    if not problem:
+    stamp = TOKEN_PROBLEM_MAP.get(token, None)
+    if not stamp:
         return "", 400
-    res = collection.find_one({"user_token": user_token})
-    if not res:
-        collection.insert_one({"user_token": user_token, "collected": [problem]})
-        return ""
-    elif problem in res.get("collected", []):
-        return "", 201
+    if add_stamp_to_user(user_token, stamp):
+        return "", 200
     else:
-        collection.update_one({"user_token": user_token}, {"$addToSet": {"collected": problem}})
-        return ""
+        return "", 201
 
 @bp.route("/stamp/<int:number>", methods=["GET"])
 def stamp_page(number):
