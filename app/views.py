@@ -45,8 +45,10 @@ def login_page():
 
 @bp.route("/guess/<int:problem>", methods=["POST"])
 def guess_page(problem):
-    answer = request.values['answer']
     user_token = session.get("user_token", None) # get user_token
+    if not user_token:
+        return "", 401
+    answer = request.values['answer']
 
     # query database problem
     collection = database["problem"]
@@ -54,8 +56,6 @@ def guess_page(problem):
     answer_length = len(res["answer"])
     correct_answer = res["answer"]
 
-    if not user_token:
-        return "", 401
     if len(answer) != answer_length:
         message = {"message": "系統錯誤"}
         return jsonify(message), 400
