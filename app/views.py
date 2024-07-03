@@ -8,7 +8,7 @@ assert secret
 username = os.getenv("MONGO_USERNAME", "admin")
 password = os.getenv("MONGO_PASSWORD", "admin")
 if current_app.config['ENV'] == 'production':
-    client = MongoClient(f"mongodb://localhost:27017/")
+    client = MongoClient(f"mongodb://172.17.0.1:27017/")
 else:
     client = MongoClient(f"mongodb://{username}:{password}@mongodb:27017/")
 collection = client["sitcon-hackathon"]["users"]
