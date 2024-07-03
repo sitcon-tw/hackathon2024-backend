@@ -12,7 +12,7 @@ services:
     volumes:
       - .:/app
   mongodb:
-    image: mongo
+    image: mongo:4.4.6
     container_name: hackathon2024-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
