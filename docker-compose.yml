@@ -1,6 +1,6 @@
 services:
   backend:
-    container_name: backend
+    container_name: hackathon2024-backend
     environment:
       - FLASK_APP=manage.py
       - FLASK_ENV=development
@@ -13,7 +13,7 @@ services:
       - .:/app
   mongodb:
     image: mongo
-    container_name: mongodb
+    container_name: hackathon2024-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
