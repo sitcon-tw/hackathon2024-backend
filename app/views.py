@@ -7,7 +7,7 @@ secret = os.getenv("SECRET")
 assert secret
 username = os.getenv("MONGO_USERNAME", "admin")
 password = os.getenv("MONGO_PASSWORD", "admin")
-client = MongoClient(f"mongodb://{username}:{password}@mongodb:27017/")
+client = MongoClient(f"mongodb://{username}:{password}@localhost:27017/")
 collection = client["sitcon-hackathon"]["users"]
 
 TOKEN_PROBLEM_MAP = {
