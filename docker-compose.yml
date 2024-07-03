@@ -4,6 +4,7 @@ services:
     environment:
       - FLASK_APP=manage.py
       - FLASK_ENV=development
+      - SECRET=very_secret_string
     build:
       context: .
     ports:

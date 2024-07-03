@@ -1,13 +1,14 @@
 import os
 from enum import Enum
-from flask import Blueprint, send_from_directory, session, request, jsonify
+from flask import Blueprint, send_from_directory, session, request, jsonify, current_app
 from pymongo import MongoClient
 
+secret = os.getenv("SECRET")
+assert secret
 username = os.getenv("MONGO_USERNAME", "admin")
 password = os.getenv("MONGO_PASSWORD", "admin")
 client = MongoClient(f"mongodb://{username}:{password}@mongodb:27017/")
-database = client["sitcon-hackathon"]
-collection = database["users"]
+collection = client["sitcon-hackathon"]["users"]
 
 TOKEN_PROBLEM_MAP = {
     '8dd5c5e969ec5d24c825a409d77cb7e42794c9708c1b80c350c70b90a38f5f36': 2,
@@ -34,7 +35,8 @@ GAME_ANS = {
             '有答案是錯的歐',
             '請再仔細看題目呦',
             '恭喜你成功!但接下來的挑戰可沒這麼簡單歐，哈哈'
-        ]
+        ],
+        'total_stamp': 3
     },
     1: {
         'answer': ['Please', 'check', 'under', 'your', 'desk'],
@@ -43,7 +45,8 @@ GAME_ANS = {
             '再仔細檢查我們精美的圖吧',
             '再仔細檢查我們精美的圖吧',
             '歡迎進到第二階段!'
-        ]
+        ],
+        'total_stamp': 1
     },
     2: {
         'answer': ['Please', 'computer'],
@@ -52,7 +55,8 @@ GAME_ANS = {
             '猜錯了歐，請再一次',
             '請再確認一下答案',
             '相當厲害，相信你也準備好進到最終試煉了，那就敬請期待吧~!'
-        ]
+        ],
+        'total_stamp': 2
     },
     3: {
         'answer': ['I', 'LOVE', 'SITCON', 'HACKATHON', '2024'],
@@ -61,15 +65,16 @@ GAME_ANS = {
             '請認真玩遊戲，不然你朋友將死於戰爭…',
             '請認真玩遊戲，不然你朋友將死於戰爭…',
             '恭喜你全數破關! 但，這只是集章活動的一部分，若要獲得最終獎品，還是得破完拼圖，並正確猜到最終答案歐😉'
-        ]
+        ],
+        'total_stamp': 4
     }
 }
 
 def add_stamp_to_user(user_token, stamp):
     res = collection.find_one({"user_token": user_token})
     if not res:
-        collection.insert_one({"user_token": user_token, "collected": [stamp]})
-        return True
+        current_app.logger.error(f'{user_token} not in the users collection')
+        return False
     elif stamp in res.get("collected", []):
         return False
     else:
@@ -82,8 +87,8 @@ class Result(Enum):
     CORRECT = 2
 
 def compare_game_ans(guess, ans):
-    guess = [x.lower() for x in guess]
-    ans = [x.lower() for x in ans]
+    guess = [x.lower().strip() for x in guess]
+    ans = [x.lower().strip() for x in ans]
     if ans == guess:
         return Result.CORRECT
     guess = sorted(guess)
@@ -95,14 +100,14 @@ def compare_game_ans(guess, ans):
 
 bp = Blueprint("main", __name__)
 
-# @bp.route("/team_info/<string:token>", methods=["GET"])
-# def team_info_page(token):
-#     collection = database["record"]
-#     res = collection.find({"user_token": token})
-#     a = []
-#     for x in res:
-#       a.append(x['problem'])
-#     return jsonify(a), 200
+@bp.route("/team_info", methods=["GET"])
+def team_info_page():
+    user_token = session.get("user_token", None)
+    if user_token:
+        res = collection.find_one({"user_token": user_token})
+        return jsonify({"problem": res['problem']}), 200
+    else:
+        return "token not matched", 201
 
 @bp.route("/is_logged", methods=["GET"])
 def is_logged_page():
@@ -110,27 +115,38 @@ def is_logged_page():
         message = {"team_name": session["team_name"]}
         return jsonify(message), 200
     else:
-        return "token not matched", 400
+        return "token not matched", 201
+
+@bp.route("/register", methods=["POST"])
+def register():
+    # TODO: secret token
+    user_token = request.json['user_token'].strip()
+    team_name = request.json['team_name'].strip()
+    if not user_token or not team_name:
+        return "", 400
+    res = collection.insert_one({"user_token": user_token, "team_name": team_name, "collected": [], "problem": 0})
+    return "", 200
 
 @bp.route("/login", methods=["POST"])
 def login_page():
-    user_token = request.values['user_token']
+    user_token = request.json['user_token'].strip()
     # query database
     res = collection.find_one({"user_token": user_token})
 
     if not res:
-        return "", 400
+        return "", 201
     else:
         session["user_token"] = user_token
         session["team_name"] = res["team_name"]
         return res["team_name"], 200
 
+# problem is 0-indexed
 @bp.route("/guess/<int:problem>", methods=["POST"])
 def guess_page(problem):
     user_token = session.get("user_token", None) # get user_token
     if not user_token:
         return "", 401
-    answer = request.values['answer']
+    answer = request.json['answer']
 
     if problem not in GAME_ANS:
         return "", 400
@@ -138,14 +154,14 @@ def guess_page(problem):
     res = compare_game_ans(answer, ans)
 
     stamps = []
-    for i in range(res):
-        stamps += GAME_ANS[problem]['stamp']
+    for i in range(res.value):
+        stamps += GAME_ANS[problem]['stamp'][i]
     for stamp in stamps:
         add_stamp_to_user(user_token, stamp)
     
-    message = {"message", GAME_ANS[problem]['message'][res]}
+    message = {"message": GAME_ANS[problem]['message'][res.value], "result": res.value, "count": len(stamps), "total_stamp": GAME_ANS[problem]['total_stamp']}
     if res == Result.CORRECT:
-        database['record'].update_one({"user_token": user_token}, {'$set':{'problem': problem}}, upsert=True)
+        collection.update_one({"user_token": user_token}, {'$max':{'problem': problem + 1}})
     return jsonify(message), 200
 
 @bp.route("/collect", methods=["POST"])
@@ -154,10 +170,10 @@ def collect_page():
     if not user_token:
         return "", 401
     data = request.get_json()
-    token = data.get("token", None)
+    token = data.get("token", None).strip()
     stamp = TOKEN_PROBLEM_MAP.get(token, None)
     if not stamp:
-        return "", 400
+        return "", 202
     if add_stamp_to_user(user_token, stamp):
         return "", 200
     else:
