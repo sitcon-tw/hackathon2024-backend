@@ -100,6 +100,11 @@ def compare_game_ans(guess, ans):
 
 bp = Blueprint("main", __name__)
 
+@bp.route("/logout", methods=["GET"])
+def logout():
+    session.clear()
+    return "", 200
+
 @bp.route("/team_info", methods=["GET"])
 def team_info_page():
     user_token = session.get("user_token", None)
@@ -119,9 +124,11 @@ def is_logged_page():
 
 @bp.route("/register", methods=["POST"])
 def register():
-    # TODO: secret token
+    secret_token = request.json['secret_token'].strip()
     user_token = request.json['user_token'].strip()
     team_name = request.json['team_name'].strip()
+    if secret_token != secret:
+        return "", 400
     if not user_token or not team_name:
         return "", 400
     res = collection.insert_one({"user_token": user_token, "team_name": team_name, "collected": [], "problem": 0})
