@@ -131,7 +131,9 @@ def register():
         return "", 400
     if not user_token or not team_name:
         return "", 400
-    res = collection.insert_one({"user_token": user_token, "team_name": team_name, "collected": [], "problem": 0})
+    if collection.find_one({"user_token": user_token}):
+        return "", 401
+    collection.insert_one({"user_token": user_token, "team_name": team_name, "collected": [], "problem": 0})
     return "", 200
 
 @bp.route("/login", methods=["POST"])
