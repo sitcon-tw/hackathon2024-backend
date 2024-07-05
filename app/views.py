@@ -124,12 +124,12 @@ def is_logged_page():
 
 @bp.route("/register", methods=["POST"])
 def register():
-    secret_token = request.json['secret_token'].strip()
-    user_token = request.json['user_token'].strip()
-    team_name = request.json['team_name'].strip()
+    secret_token = request.json.get('secret_token', '').strip()
+    user_token = request.json.get('user_token', '').strip()
+    team_name = request.json.get('team_name', '').strip()
     if secret_token != secret:
         return "", 400
-    if not user_token or not team_name:
+    if user_token == '' or team_name == '':
         return "", 400
     if collection.find_one({"user_token": user_token}):
         return "", 401
