@@ -20,6 +20,6 @@ services:
       MONGO_INITDB_DATABASE: db
       TZ: Asia/Taipei
     ports:
-      - 27018:27017
+      - 127.0.0.1:27018:27017
     volumes:
       - ./data:/data/db
