@@ -100,6 +100,11 @@ def compare_game_ans(guess, ans):
 
 bp = Blueprint("main", __name__)
 
+@bp.before_app_request
+def set_permanent_session():
+    print('has request')
+    session.permanent = True
+
 @bp.route("/logout", methods=["GET"])
 def logout():
     session.clear()
